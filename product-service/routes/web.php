@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MenuController;
+
 
 // Halaman Utama (Welcome Page)
 // Memanggil file welcome_page.blade.php
@@ -17,3 +19,5 @@ Route::get('/customer', function () {
 Route::get('/restaurant', function () {
     return view('restaurant_dashboard'); 
 });
+
+Route::resource('menus', MenuController::class);
