@@ -33,7 +33,7 @@
             <button id="btn-customer" onclick="window.location.href='/customer'">
                 <i class="fas fa-user"></i> Akses sebagai **CUSTOMER**
             </button>
-            <button id="btn-restaurant" onclick="window.location.href='/restaurant'">
+            <button id="btn-restaurant" onclick="window.location.href='/menus'">
                 <i class="fas fa-utensils"></i> Akses sebagai **RESTAURANT**
             </button>
         </div>
