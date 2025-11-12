@@ -1,10 +1,20 @@
-# menu_service/app.py
 import sqlite3
 import os
 import contextlib
-from flask import Flask, request, jsonify
+import time
+from flask import Flask, request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
+from flask_cors import CORS
 
 app = Flask(__name__)
+
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://127.0.0.1:8000", "http://localhost:8000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 DB_NAME = "menu_data.db"
 DB_PATH = os.path.join(os.path.dirname(__file__), DB_NAME)
@@ -31,23 +41,51 @@ def init_db():
             )
         """)
         conn.commit()
-    print(f"Menu Service: Database '{DB_NAME}' initialized")
+    print("Menu Service: DB initialized")
 
-# CREATE
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 @app.route('/menus', methods=['POST'])
 def create_menu():
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    
-    data = request.get_json()
-    name = data.get('name')
-    description = data.get('description')
-    price = data.get('price')
-    category = data.get('category')
-    image_url = data.get('image_url')
+    if 'multipart/form-data' not in request.content_type:
+        return jsonify({"error": "Use form-data"}), 415
 
-    if not name or price is None or not category:
-        return jsonify({"error": "Name, price, and category are required"}), 400
+    name = request.form.get('name')
+    price = request.form.get('price')
+    category = request.form.get('category')
+    description = request.form.get('description', '')
+    image_file = request.files.get('image')
+
+    if not all([name, price, category, image_file]):
+        return jsonify({"error": "name, price, category, image required"}), 400
+
+    try:
+        price = float(price)
+    except:
+        return jsonify({"error": "price must be number"}), 400
+
+    if not allowed_file(image_file.filename):
+        return jsonify({"error": "File type not allowed"}), 400
+
+    filename = secure_filename(image_file.filename)
+    name_part, ext = os.path.splitext(filename)
+    unique_filename = f"{name_part}_{int(time.time())}{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+    image_file.save(filepath)
+
+    image_url = f"http://127.0.0.1:5002/uploads/{unique_filename}"
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -58,9 +96,76 @@ def create_menu():
         conn.commit()
         menu_id = cursor.lastrowid
 
-    return jsonify({"id": menu_id, **data}), 201
+    return jsonify({
+        "id": menu_id,
+        "name": name,
+        "description": description,
+        "price": price,
+        "category": category,
+        "image_url": image_url
+    }), 201
 
-# READ ALL
+
+@app.route('/menus/<int:menu_id>', methods=['PUT'])
+def update_menu(menu_id):
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT image_url FROM menus WHERE id = ?", (menu_id,))
+        old = cursor.fetchone()
+        if not old:
+            return jsonify({"error": "Not found"}), 404
+    old_image_url = old[0]
+
+    if 'multipart/form-data' not in request.content_type:
+        return jsonify({"error": "Use form-data"}), 415
+
+    name = request.form.get('name')
+    price = request.form.get('price')
+    category = request.form.get('category')
+    description = request.form.get('description')
+
+    update_data = {}
+    if name: update_data['name'] = name
+    if description is not None: update_data['description'] = description
+    if price is not None:
+        try:
+            update_data['price'] = float(price)
+        except:
+            return jsonify({"error": "Invalid price"}), 400
+    if category: update_data['category'] = category
+
+    final_image_url = old_image_url
+    image_file = request.files.get('image')
+
+    if image_file and image_file.filename:
+        if not allowed_file(image_file.filename):
+            return jsonify({"error": "Invalid file type"}), 400
+        filename = secure_filename(image_file.filename)
+        name_part, ext = os.path.splitext(filename)
+        unique_filename = f"{name_part}_{int(time.time())}{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        image_file.save(filepath)
+        final_image_url = f"http://127.0.0.1:5002/uploads/{unique_filename}"
+        update_data['image_url'] = final_image_url
+
+    if update_data:
+        set_clause = ", ".join([f"{k} = ?" for k in update_data])
+        values = list(update_data.values()) + [menu_id]
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"UPDATE menus SET {set_clause} WHERE id = ?", values)
+            conn.commit()
+
+    if old_image_url and final_image_url != old_image_url:
+        old_path = old_image_url.replace("http://127.0.0.1:5002/uploads/", os.path.join(app.config['UPLOAD_FOLDER'], ""))
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except:
+                pass
+
+    return jsonify({"message": "Updated"}), 200
+
 @app.route('/menus', methods=['GET'])
 def get_all_menus():
     with get_db_connection() as conn:
@@ -68,10 +173,8 @@ def get_all_menus():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM menus")
         menus = cursor.fetchall()
-
     return jsonify([dict(m) for m in menus]), 200
 
-# READ BY ID
 @app.route('/menus/<int:menu_id>', methods=['GET'])
 def get_menu(menu_id):
     with get_db_connection() as conn:
@@ -79,128 +182,32 @@ def get_menu(menu_id):
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM menus WHERE id = ?", (menu_id,))
         menu = cursor.fetchone()
-
     if not menu:
-        return jsonify({"error": "Menu not found"}), 404
-    
+        return jsonify({"error": "Not found"}), 404
     return jsonify(dict(menu)), 200
 
-# UPDATE
-@app.route('/menus/<int:menu_id>', methods=['PUT'])
-def update_menu(menu_id):
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    
-    data = request.get_json()
-
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM menus WHERE id = ?", (menu_id,))
-        exists = cursor.fetchone()
-
-        if not exists:
-            return jsonify({"error": "Menu not found"}), 404
-        
-        cursor.execute("""
-            UPDATE menus
-            SET name = ?, description = ?, price = ?, category = ?, image_url = ?
-            WHERE id = ?
-        """, (data["name"], data["description"], data["price"], data["category"], data.get("image_url"), menu_id))
-        conn.commit()
-
-    return jsonify({"message": "Menu updated successfully"}), 200
-
-# DELETE
 @app.route('/menus/<int:menu_id>', methods=['DELETE'])
 def delete_menu(menu_id):
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM menus WHERE id = ?", (menu_id,))
-        exists = cursor.fetchone()
-
-        if not exists:
-            return jsonify({"error": "Menu not found"}), 404
-        
+        cursor.execute("SELECT image_url FROM menus WHERE id = ?", (menu_id,))
+        menu = cursor.fetchone()
+        if not menu:
+            return jsonify({"error": "Not found"}), 404
         cursor.execute("DELETE FROM menus WHERE id = ?", (menu_id,))
         conn.commit()
 
-    return jsonify({"message": "Menu deleted successfully"}), 200
+    if menu[0]:
+        filepath = menu[0].replace("http://127.0.0.1:5002/uploads/", os.path.join(app.config['UPLOAD_FOLDER'], ""))
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except:
+                pass
 
-@app.route('/orders', methods=['POST'])
-def create_order():
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    
-    data = request.get_json()
-    menu_id = data.get('menu_id')
-    quantity = data.get('quantity', 1)
-    customer_name = data.get('customer_name')
-    table_number = data.get('table_number')
-
-    if not menu_id or not customer_name:
-        return jsonify({"error": "menu_id and customer_name required"}), 400
-
-    # Cek menu ada
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, price FROM menus WHERE id = ?", (menu_id,))
-        menu = cursor.fetchone()
-        if not menu:
-            return jsonify({"error": "Menu not found"}), 404
-
-        total_price = menu[2] * quantity
-
-        cursor.execute("""
-            INSERT INTO orders (menu_id, menu_name, quantity, total_price, customer_name, table_number, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (menu_id, menu[1], quantity, total_price, customer_name, table_number, 'pending'))
-        conn.commit()
-        order_id = cursor.lastrowid
-
-    return jsonify({
-        "id": order_id,
-        "menu_id": menu_id,
-        "quantity": quantity,
-        "total_price": total_price,
-        "customer_name": customer_name,
-        "table_number": table_number,
-        "status": "pending"
-    }), 201
-
-@app.route('/orders', methods=['GET'])
-def get_all_orders():
-    with get_db_connection() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT o.*, m.name as menu_name 
-            FROM orders o 
-            JOIN menus m ON o.menu_id = m.id 
-            ORDER BY o.created_at DESC
-        """)
-        orders = cursor.fetchall()
-
-    return jsonify([dict(o) for o in orders]), 200
-
-@app.route('/orders/<int:order_id>/status', methods=['PUT'])
-def update_order_status(order_id):
-    if not request.is_json:
-        return jsonify({"error": "JSON required"}), 400
-    
-    data = request.get_json()
-    status = data.get('status')
-    if status not in ['pending', 'confirmed', 'done', 'cancelled']:
-        return jsonify({"error": "Invalid status"}), 400
-
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
-        if cursor.rowcount == 0:
-            return jsonify({"error": "Order not found"}), 404
-        conn.commit()
-
-    return jsonify({"message": "Status updated", "new_status": status}), 200
+    return jsonify({"message": "Deleted"}), 200
 
 if __name__ == '__main__':
     init_db()
-    app.run(port=5002, debug=True)
+    print("Menu Service: http://127.0.0.1:5002")
+    app.run(host='127.0.0.1', port=5002, debug=True)

@@ -7,49 +7,97 @@ use Illuminate\Support\Facades\Http;
 
 class OrderController extends Controller
 {
-    protected $apiUrl = 'http://127.0.0.1:5002';
+    protected $orderService = 'http://127.0.0.1:5003';
+    protected $menuService = 'http://127.0.0.1:5002';
 
     public function index()
     {
-        $response = Http::get("{$this->apiUrl}/orders");
-        $orders = $response->successful() ? $response->json() : [];
-        return view('orders.index', compact('orders'));
+        $menusResponse = Http::get("{$this->menuService}/menus");
+        $menus = $menusResponse->successful() ? $menusResponse->json() : [];
+        return view('order.index', compact('menus'));
     }
 
-    public function create($menuId = null)
+
+    public function restaurantIndex()
     {
-        $menus = Http::get("{$this->apiUrl}/menus")->json();
-        return view('orders.create', compact('menus', 'menuId'));
+        $ordersResponse = Http::get("{$this->orderService}/orders");
+        $orders = $ordersResponse->successful() ? $ordersResponse->json() : [];
+        return view('restaurant_dashboard', compact('orders'));
     }
 
-    public function store(Request $request)
+    public function create(Request $request)
+    {
+        $menu = null;
+        if ($request->has('menu_id')) {
+            $response = Http::get("{$this->menuService}/menus/{$request->menu_id}");
+            $menu = $response->successful() ? $response->json() : null;
+        }
+        return view('order.create', compact('menu'));
+    }
+
+    public function show($id)
+    {
+        $response = Http::get("{$this->menuService}/menus/{$id}");
+        if ($response->failed()) abort(404);
+        $menu = $response->json();
+        return view('order.show', compact('menu'));
+    }
+
+    public function orderStore(Request $request)
     {
         $request->validate([
-            'menu_id' => 'required|exists:menus,id',
-            'quantity' => 'required|integer|min:1',
+            'menu_id' => 'required|integer',
             'customer_name' => 'required|string|max:255',
+            'quantity' => 'required|integer|min:1',
             'table_number' => 'nullable|string'
         ]);
 
-        $response = Http::post("{$this->apiUrl}/orders", $request->only([
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json'
+        ])->post("{$this->orderService}/orders", $request->only([
             'menu_id', 'quantity', 'customer_name', 'table_number'
         ]));
 
         if ($response->failed()) {
-            return back()->withErrors(['error' => 'Gagal memesan.']);
+            return back()->with('error', 'Gagal mengirim pesanan.');
         }
 
-        return redirect()->route('orders.index')->with('success', 'Pesanan berhasil!');
+        return redirect()->route('order.index')->with('success', 'Pesanan berhasil dikirim!');
     }
 
-    public function updateStatus(Request $request, $id)
+    public function history(Request $request)
     {
-        $request->validate(['status' => 'required|in:pending,confirmed,done,cancelled']);
-        
-        $response = Http::put("{$this->apiUrl}/orders/{$id}/status", [
-            'status' => $request->status
+        $allOrders = Http::get("{$this->orderService}/orders")->successful() ? Http::get("{$this->orderService}/orders")->json() : [];
+
+        $customerName = $request->input('customer_name', '');
+        if ($customerName) {
+             $myOrders = array_filter($allOrders, fn($o) => $o['customer_name'] === $customerName);
+        } else {
+             $myOrders = []; 
+        }
+
+        return view('order.history', compact('myOrders', 'customerName'));
+    }
+
+    public function reviewStore(Request $request)
+    {
+        $request->validate([
+            'menu_id' => 'required|integer',
+            'customer_name' => 'required|string|max:255',
+            'rating' => 'required|in:1,2,3,4,5',
+            'comment' => 'nullable|string'
         ]);
 
-        return response()->json(['success' => $response->successful()]);
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json'
+        ])->post("{$this->orderService}/reviews", $request->only([
+            'menu_id', 'customer_name', 'rating', 'comment'
+        ]));
+
+        if ($response->failed()) {
+            return back()->with('error', 'Gagal mengirim ulasan.');
+        }
+
+        return back()->with('success', 'Ulasan berhasil dikirim!');
     }
 }

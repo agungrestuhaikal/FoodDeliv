@@ -4,25 +4,23 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderController;
 
+Route::get('/', fn() => view('welcome_page'))->name('home');
 
-// Halaman Utama (Welcome Page)
-// Memanggil file welcome_page.blade.php
-Route::get('/', function () {
-    return view('welcome_page'); 
-});
+Route::get('/restaurant', [OrderController::class, 'restaurantIndex'])->name('restaurant.dashboard');
 
-// Halaman Customer (Consumer)
-Route::get('/customer', function () {
-    return view('customer_view'); 
-});
+Route::resource('menus', MenuController::class); 
 
-// Halaman Restaurant (Provider)
-Route::get('/restaurant', function () {
-    return view('restaurant_dashboard'); 
-});
+Route::post('/logout', function (Request $request) {
+    Auth::logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+    return redirect('/'); 
+})->name('logout.custom');
 
-Route::resource('menus', MenuController::class);
+Route::get('/order/history', [OrderController::class, 'history'])->name('order.history'); 
+Route::post('order/orders', [OrderController::class, 'orderStore'])->name('order.orders.store');
+Route::post('order/reviews', [OrderController::class, 'reviewStore'])->name('order.reviews.store');
 
+Route::get('/order', [OrderController::class, 'index'])->name('order.index'); 
 
-Route::resource('orders', OrderController::class);
-Route::post('orders/{id}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
+Route::resource('order', OrderController::class)->only(['create', 'show']);

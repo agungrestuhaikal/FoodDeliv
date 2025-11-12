@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Utils;
 
 class MenuController extends Controller
 {
-    protected $apiUrl = 'http://localhost:5002/menus';
+    protected $apiUrl = 'http://127.0.0.1:5002/menus';
 
     public function index()
     {
-        $response = Http::get($this->apiUrl);
+        $response = \Illuminate\Support\Facades\Http::get($this->apiUrl);
         $menus = $response->successful() ? $response->json() : [];
         return view('menus.index', compact('menus'));
     }
@@ -29,43 +29,53 @@ class MenuController extends Controller
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'category' => 'required|string',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048'
+            'image' => 'required|image|mimes:jpg,jpeg,png,gif|max:2048'
         ]);
 
-        $data = $request->only(['name', 'description', 'price', 'category']);
-        $data['image_url'] = null;
+        $image = $request->file('image');
+        $client = new Client();
 
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('images', 'public');
-            $data['image_url'] = asset('storage/' . $path);
+        $multipart = [
+            ['name' => 'name', 'contents' => $request->name],
+            ['name' => 'description', 'contents' => $request->description ?? ''],
+            ['name' => 'price', 'contents' => $request->price],
+            ['name' => 'category', 'contents' => $request->category],
+            [
+                'name' => 'image',
+                'contents' => Utils::tryFopen($image->getRealPath(), 'r'),
+                'filename' => $image->getClientOriginalName(),
+                'headers' => ['Content-Type' => $image->getMimeType()]
+            ]
+        ];
+
+        try {
+            $client->post($this->apiUrl, ['multipart' => $multipart]);
+            return redirect()->route('restaurant.dashboard')->with('success', 'Menu ditambahkan!');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Gagal: ' . $e->getMessage()]);
         }
-
-        $response = Http::post($this->apiUrl, $data);
-
-        if ($response->failed()) {
-            if (isset($path)) Storage::disk('public')->delete($path);
-            return back()->withErrors(['error' => 'Gagal menyimpan menu.']);
-        }
-
-        return redirect()->route('menus.index')->with('success', 'Menu ditambahkan!');
     }
 
     public function show($id)
     {
-        $response = Http::get("{$this->apiUrl}/{$id}");
+        $response = \Illuminate\Support\Facades\Http::get("{$this->apiUrl}/{$id}");
         if ($response->failed()) {
-            return redirect()->route('menus.index')->withErrors(['error' => 'Menu tidak ditemukan.']);
+            return redirect()->route('restaurant.dashboard')
+                ->withErrors(['error' => 'Menu tidak ditemukan.']);
         }
+
         $menu = $response->json();
         return view('menus.show', compact('menu'));
     }
 
     public function edit($id)
     {
-        $response = Http::get("{$this->apiUrl}/{$id}");
+        $response = \Illuminate\Support\Facades\Http::get("{$this->apiUrl}/{$id}");
         if ($response->failed()) {
-            return redirect()->route('menus.index')->withErrors(['error' => 'Menu tidak ditemukan.']);
+            return redirect()->route('restaurant.dashboard')
+                ->withErrors(['error' => 'Menu tidak ditemukan.']);
         }
+
         $menu = $response->json();
         return view('menus.edit', compact('menu'));
     }
@@ -79,45 +89,35 @@ class MenuController extends Controller
             'image' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048'
         ]);
 
-        $old = Http::get("{$this->apiUrl}/{$id}")->json();
-        $data = $request->only(['name', 'description', 'price', 'category']);
+        $multipart = [
+            ['name' => 'name', 'contents' => $request->name],
+            ['name' => 'price', 'contents' => $request->price],
+            ['name' => 'category', 'contents' => $request->category],
+            ['name' => 'description', 'contents' => $request->description ?? '']
+        ];
 
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('images', 'public');
-            $data['image_url'] = asset('storage/' . $path);
-        } else {
-            $data['image_url'] = $old['image_url'] ?? null;
+            $image = $request->file('image');
+            $multipart[] = [
+                'name' => 'image',
+                'contents' => Utils::tryFopen($image->getRealPath(), 'r'),
+                'filename' => $image->getClientOriginalName(),
+                'headers' => ['Content-Type' => $image->getMimeType()]
+            ];
         }
 
-        $response = Http::put("{$this->apiUrl}/{$id}", $data);
-
-        if ($response->failed()) {
-            if (isset($path)) Storage::disk('public')->delete($path);
-            return back()->withErrors(['error' => 'Gagal update.']);
+        $client = new Client();
+        try {
+            $client->put("{$this->apiUrl}/{$id}", ['multipart' => $multipart]);
+            return redirect()->route('restaurant.dashboard')->with('success', 'Menu diupdate!');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Gagal: ' . $e->getMessage()]);
         }
-
-        if (isset($path) && $old['image_url'] && str_contains($old['image_url'], '/storage/')) {
-            $oldPath = str_replace(asset('storage/'), '', $old['image_url']);
-            Storage::disk('public')->delete($oldPath);
-        }
-
-        return redirect()->route('menus.index')->with('success', 'Menu diupdate!');
     }
 
     public function destroy($id)
     {
-        $menu = Http::get("{$this->apiUrl}/{$id}")->json();
-        $response = Http::delete("{$this->apiUrl}/{$id}");
-
-        if ($response->failed()) {
-            return back()->withErrors(['error' => 'Gagal hapus.']);
-        }
-
-        if ($menu['image_url'] && str_contains($menu['image_url'], '/storage/')) {
-            $path = str_replace(asset('storage/'), '', $menu['image_url']);
-            Storage::disk('public')->delete($path);
-        }
-
-        return redirect()->route('menus.index')->with('success', 'Menu dihapus!');
+        \Illuminate\Support\Facades\Http::delete("{$this->apiUrl}/{$id}");
+        return redirect()->route('restaurant.dashboard')->with('success', 'Menu dihapus!');
     }
 }

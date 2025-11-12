@@ -4,10 +4,13 @@
 @section('content')
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Tambah Menu Baru</h5>
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-header bg-success text-white rounded-top-4">
+                <h5 class="mb-0 fw-semibold">
+                    <i class="bi bi-plus-circle me-2"></i> Tambah Menu Baru
+                </h5>
             </div>
+
             <div class="card-body p-4">
                 <form action="{{ route('menus.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
@@ -53,8 +56,12 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-success btn-lg">Simpan</button>
-                        <a href="{{ route('menus.index') }}" class="btn btn-secondary btn-lg">Kembali</a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle me-2"></i> Simpan
+                        </button>
+                        <a href="{{ route('menus.index') }}" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-arrow-left me-2"></i> Kembali
+                        </a>
                     </div>
                 </form>
             </div>
