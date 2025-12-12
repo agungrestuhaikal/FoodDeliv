@@ -1,0 +1,155 @@
+"Format tanggal otomatis Laravel"
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+# ==========================================
+# QUERY (UNTUK MEMBACA DATA)
+# ==========================================
+type Query {
+    "Mengambil semua user (Customer & Restaurant)"
+    users: [User!]! @all
+
+    "Cari user berdasarkan ID"
+    user(id: ID! @eq): User @find
+
+    "Mengambil semua restoran"
+    restaurants: [Restaurant!]! @all
+
+    "Mengambil semua menu"
+    menus: [Menu!]! @all
+
+    "Cari menu spesifik"
+    menu(id: ID! @eq): Menu @find
+
+    "Mengambil semua order (Bisa filter by user_id atau status)"
+    orders(
+        user_id: ID @eq
+        status: String @eq
+    ): [Order!]! @all
+
+    "Mengambil semua review"
+    reviews: [Review!]! @all
+}
+
+# ==========================================
+# MUTATION (UNTUK CREATE / UPDATE / DELETE)
+# ==========================================
+type Mutation {
+    "Register User Baru lewat GraphQL"
+    createUser(
+        name: String!
+        email: String!
+        role: String! # Isi 'customer' atau 'restaurant'
+        password: String!
+    ): User @create
+
+    "Tambah Menu Baru (Khusus Restoran)"
+    createMenu(
+        restaurant_id: ID!
+        name: String!
+        description: String
+        price: Int!
+        stock: Int
+        category: String!
+        image: String
+    ): Menu @create
+
+    "Update Data Menu"
+    updateMenu(
+        id: ID!
+        name: String
+        price: Int
+        stock: Int
+    ): Menu @update
+
+    "Hapus Menu"
+    deleteMenu(id: ID!): Menu @delete
+
+    "Buat Pesanan Baru (Create Order)"
+    createOrder(
+        user_id: ID!          # ID Customer yang login
+        menu_id: ID!          # ID Menu yang dipesan
+        menu_name: String!    # Nama menu (snapshot)
+        quantity: Int!
+        total_price: Int!     # Hitung di frontend: price * quantity
+        customer_name: String!
+        customer_address: String!
+        status: String        # Default: pending
+    ): Order @create
+
+    "Update Status Pesanan (Misal: dari pending -> done)"
+    updateOrderStatus(
+        id: ID!
+        status: String!
+    ): Order @update
+
+    "Kirim Review"
+    createReview(
+        menu_id: ID!
+        customer_name: String!
+        rating: Int!
+        comment: String
+    ): Review @create
+}
+
+# ==========================================
+# TYPE DEFINITIONS (STRUKTUR TABEL)
+# ==========================================
+
+type User {
+    id: ID!
+    name: String!
+    email: String!
+    role: String!
+    created_at: DateTime!
+    orders: [Order!]! @hasMany
+}
+
+type Restaurant {
+    id: ID!
+    name: String!
+    address: String
+    phone: String
+    menus: [Menu!]! @hasMany
+}
+
+type Menu {
+    id: ID!
+    name: String!
+    description: String
+    price: Int!
+    image: String
+    category: String!
+    stock: Int
+    created_at: DateTime!
+    updated_at: DateTime!
+    
+    # Relasi
+    restaurant: Restaurant! @belongsTo
+    reviews: [Review!]! @hasMany
+    orders: [Order!]! @hasMany
+}
+
+type Order {
+    id: ID!
+    user_id: ID!
+    menu_name: String!
+    quantity: Int!
+    total_price: Int!
+    customer_name: String!
+    customer_address: String!
+    status: String!
+    created_at: DateTime!
+    
+    # Relasi
+    user: User! @belongsTo
+    menu: Menu! @belongsTo
+}
+
+type Review {
+    id: ID!
+    customer_name: String!
+    rating: Int!
+    comment: String
+    created_at: DateTime!
+    menu: Menu! @belongsTo
+}

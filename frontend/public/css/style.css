@@ -1,0 +1,217 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', sans-serif;
+    background-color: #f6f8f5;
+    color: #333;
+    overflow-x: hidden;
+}
+
+nav.navbar {
+    display: none !important;
+}
+
+.layout-wrapper {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 200px;
+    background-color: #2e7d32;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2rem 1rem;
+    box-sizing: border-box;
+}
+
+.sidebar h4 a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.sidebar a {
+    display: block;
+    color: #dcedc8;
+    text-decoration: none;
+    margin: 0.75rem 0;
+    transition: 0.2s ease-in-out;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+    color: #fff;
+    font-weight: 600;
+}
+
+.logout-btn {
+    background-color: #1b5e20;
+    border: none;
+    color: white;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 0.6rem 0;
+    width: 100%;
+    transition: 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: #388e3c;
+}
+
+.main-content {
+    margin-left: 200px;
+    flex: 1;
+    padding: 2rem 2rem;
+    max-width: 1600px;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
+.card-stat {
+    border-radius: 16px;
+    background-color: #edf7ed;
+    padding: 1.2rem;
+    text-align: center;
+    color: #2e7d32;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+}
+
+.content-area {
+    background-color: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+}
+
+.table thead {
+    background-color: #f1f8f4;
+}
+.badge {
+    font-size: 0.8rem;
+    border-radius: 10px;
+    padding: 0.4rem 0.6rem;
+}
+.bg-success {
+    background-color: #c8e6c9 !important;
+    color: #2e7d32 !important;
+}
+.bg-warning {
+    background-color: #fff8e1 !important;
+    color: #f57f17 !important;
+}
+.bg-danger {
+    background-color: #ffcdd2 !important;
+    color: #c62828 !important;
+}
+.bg-info {
+    background-color: #bbdefb !important;
+    color: #1565c0 !important;
+}
+
+.card {
+    border-radius: 20px;
+    border: none;
+    background: #ffffff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.card h5 {
+    font-weight: 600;
+    color: #333;
+}
+
+.card p {
+    font-size: 0.9rem;
+}
+
+.card .badge {
+    border-radius: 8px;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+}
+
+.btn-group .btn {
+    border-radius: 8px !important;
+    transition: 0.2s ease-in-out;
+}
+
+.btn-outline-success {
+    border-color: #2e7d32;
+    color: #2e7d32;
+}
+
+.btn-outline-success:hover {
+    background-color: #2e7d32;
+    color: #fff;
+}
+
+.btn-outline-warning {
+    border-color: #fbc02d;
+    color: #f57f17;
+}
+
+.btn-outline-warning:hover {
+    background-color: #fbc02d;
+    color: #fff;
+}
+
+.btn-outline-danger {
+    border-color: #d32f2f;
+    color: #d32f2f;
+}
+
+.btn-outline-danger:hover {
+    background-color: #d32f2f;
+    color: #fff;
+}
+
+.btn-success {
+    background-color: #2e7d32;
+    border: none;
+}
+.btn-success:hover {
+    background-color: #256428;
+}
+
+.btn-primary, .btn-success {
+    border-radius: 8px;
+    font-weight: 500;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 160px;
+        padding: 1.5rem 0.5rem;
+    }
+
+    .main-content {
+        margin-left: 160px;
+        padding: 1rem;
+    }
+
+    .card {
+        border-radius: 16px;
+    }
+    
+}
